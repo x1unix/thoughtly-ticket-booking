@@ -48,3 +48,17 @@ func FromEnv() (*Config, error) {
 
 	return cfg, nil
 }
+
+// DBConfigFromEnv loads and returns database config from environment variables.
+//
+// Used for migration by goose.
+func DBConfigFromEnv() (*DBConfig, error) {
+	cfg := &DBConfig{}
+
+	err := envconfig.Process("APP_DB", cfg)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load config: %w", err)
+	}
+
+	return cfg, nil
+}

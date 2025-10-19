@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/goccy/go-json"
@@ -36,6 +37,9 @@ func NewServer(ctx context.Context, logger *zap.Logger, cfg *config.Config) (*Se
 	db, err := cfg.DB.NewPgxPool(ctx)
 	if err != nil {
 		return nil, err
+	}
+	if err := db.Ping(ctx); err != nil {
+		return nil, fmt.Errorf("failed to conn to db: %w", err)
 	}
 	_ = rdb
 	_ = db
