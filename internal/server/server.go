@@ -5,7 +5,8 @@ import (
 	"errors"
 	"time"
 
-	"github.com/gofiber/fiber/v3"
+	"github.com/gofiber/fiber/v2"
+	fiberRecover "github.com/gofiber/fiber/v2/middleware/recover"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
 	"go.uber.org/zap"
@@ -43,14 +44,19 @@ func NewServer(ctx context.Context, logger *zap.Logger, cfg *config.Config) (*Se
 
 func (srv *Server) Listen(ctx context.Context) {
 	app := fiber.New(fiber.Config{
-		IdleTimeout: idleTimeout,
+		DisableStartupMessage: true,
+		IdleTimeout:           idleTimeout,
+		ErrorHandler: func(c *fiber.Ctx, err error) error {
+			srv.logger.Error(err)
+			return fiber.DefaultErrorHandler(c, err)
+		},
 	})
 
-	srv.logger.Infof("listening on %q", srv.cfg.HTTP.ListenAddress)
+	app.Use(fiberRecover.New())
+
 	go func() {
-		err := app.Listen(srv.cfg.HTTP.ListenAddress, fiber.ListenConfig{
-			DisableStartupMessage: true,
-		})
+		srv.logger.Infof("listening on %q", srv.cfg.HTTP.ListenAddress)
+		err := app.Listen(srv.cfg.HTTP.ListenAddress)
 		if err != nil {
 			if errors.Is(err, context.Canceled) {
 				return
