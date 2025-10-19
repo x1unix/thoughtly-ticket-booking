@@ -5,6 +5,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/goccy/go-json"
 	"github.com/gofiber/fiber/v2"
 	fiberRecover "github.com/gofiber/fiber/v2/middleware/recover"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -39,13 +40,18 @@ func NewServer(ctx context.Context, logger *zap.Logger, cfg *config.Config) (*Se
 	_ = rdb
 	_ = db
 
-	return nil, nil
+	return &Server{
+		logger: logger.Sugar(),
+		cfg:    cfg,
+	}, nil
 }
 
 func (srv *Server) Listen(ctx context.Context) {
 	app := fiber.New(fiber.Config{
 		DisableStartupMessage: true,
 		IdleTimeout:           idleTimeout,
+		JSONEncoder:           json.Marshal,
+		JSONDecoder:           json.Unmarshal,
 		ErrorHandler: func(c *fiber.Ctx, err error) error {
 			srv.logger.Error(err)
 			return fiber.DefaultErrorHandler(c, err)
@@ -53,6 +59,9 @@ func (srv *Server) Listen(ctx context.Context) {
 	})
 
 	app.Use(fiberRecover.New())
+	app.Get("/readyz", func(c *fiber.Ctx) error {
+		return c.SendString("test")
+	})
 
 	go func() {
 		srv.logger.Infof("listening on %q", srv.cfg.HTTP.ListenAddress)
