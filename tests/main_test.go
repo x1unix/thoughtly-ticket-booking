@@ -86,6 +86,7 @@ func truncateDB(ctx context.Context, cfg config.DBConfig) error {
 		`TRUNCATE TABLE tickets CASCADE`,
 		`TRUNCATE TABLE ticket_tiers CASCADE`,
 		`TRUNCATE TABLE events CASCADE`,
+		`TRUNCATE TABLE reservations CASCADE`,
 	}
 
 	for _, q := range queries {
