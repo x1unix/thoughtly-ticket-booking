@@ -11,7 +11,7 @@ type Event struct {
 
 type TicketTier struct {
 	TierID         uuid.UUID `json:"tier_id" db:"tier_id"`
-	Name           string    `json:"name" db:"name"`
+	Name           string    `json:"name" db:"tier_name"`
 	PriceCents     int       `json:"priceCents" db:"price_cents"`
 	AvailableCount int       `json:"availableCount" db:"available_count"`
 }

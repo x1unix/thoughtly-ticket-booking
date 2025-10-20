@@ -104,11 +104,10 @@ func (svc Service) GetTicketTiers(ctx context.Context, eventID uuid.UUID) ([]*Ti
 		tt.id AS tier_id,
 		tt.name AS tier_name,
 		tt.price_cents,
-		tt.event_id,
 		COUNT(*) FILTER (
 			WHERE t.is_sold = FALSE 
 			AND (t.hold_expires_at IS NULL OR t.hold_expires_at < now())
-		) AS available_tickets
+		) AS available_count
 	FROM ticket_tiers tt
 	LEFT JOIN tickets t ON t.tier_id = tt.id
 	WHERE tt.event_id = $1  -- Replace with your event_id parameter

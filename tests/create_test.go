@@ -5,28 +5,48 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/x1unix/thoughtly-ticket-booking/internal/booking"
 )
 
 func TestTicketsCreate(t *testing.T) {
 	eventName := fmt.Sprintf("CreateEventTest-%v", time.Now().UnixNano())
-	rsp := client.CreateEvent(t, booking.EventCreateParams{
-		EventName: eventName,
-		Tiers: map[string]booking.CreateTierParams{
-			"VIP": {
-				PriceCents:   100_00,
-				TicketsCount: 10,
-			},
-			"Front Row": {
-				PriceCents:   50_00,
-				TicketsCount: 40,
-			},
-			"GA": {
-				PriceCents:   10_00,
-				TicketsCount: 100,
-			},
+	tiers := map[string]booking.CreateTierParams{
+		"VIP": {
+			PriceCents:   100_00,
+			TicketsCount: 10,
 		},
+		"Front Row": {
+			PriceCents:   50_00,
+			TicketsCount: 40,
+		},
+		"GA": {
+			PriceCents:   10_00,
+			TicketsCount: 100,
+		},
+	}
+
+	createRsp := client.CreateEvent(t, booking.EventCreateParams{
+		EventName: eventName,
+		Tiers:     tiers,
 	})
 
-	t.Logf("%#v", rsp)
+	eventsRsp := client.GetEvents(t)
+	require.Contains(t, eventsRsp.Events, &booking.Event{
+		ID:   createRsp.EventID,
+		Name: eventName,
+	})
+
+	tiersRsp := client.GetTicketTiers(t, createRsp.EventID)
+	require.Len(t, tiersRsp.Tiers, len(tiers))
+	for _, tier := range tiersRsp.Tiers {
+		info, ok := tiers[tier.Name]
+		require.Truef(t, ok, "missing tier %q", tier.Name)
+
+		require.Equal(t, info, booking.CreateTierParams{
+			PriceCents:   tier.PriceCents,
+			TicketsCount: tier.AvailableCount,
+		})
+	}
 }

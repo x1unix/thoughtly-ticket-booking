@@ -72,7 +72,7 @@ func (c *Client) CreateEvent(t *testing.T, body booking.EventCreateParams) *book
 	return rsp
 }
 
-func (c *Client) GetEvents(t *testing.T, body booking.EventCreateParams) *server.ListEventsResponse {
+func (c *Client) GetEvents(t *testing.T) *server.ListEventsResponse {
 	t.Helper()
 	req, err := c.newGetRequest("/api/events")
 	require.NoError(t, err)
