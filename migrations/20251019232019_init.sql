@@ -35,6 +35,7 @@ CREATE TABLE reservations (
   actor_id UUID NOT NULL,
   expires_at TIMESTAMPTZ NOT NULL,
   idempotency_key UUID UNIQUE,
+  is_paid BOOLEAN NOT NULL DEFAULT FALSE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -60,4 +61,5 @@ DROP INDEX IF EXISTS idx_tickets_tier_sold;
 DROP TABLE IF EXISTS tickets;
 DROP TABLE IF EXISTS ticket_tiers;
 DROP TABLE IF EXISTS events;
+DROP TABLE IF EXISTS reservations;
 -- +goose StatementEnd
