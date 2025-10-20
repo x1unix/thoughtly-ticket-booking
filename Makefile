@@ -12,6 +12,10 @@ run:
 test:
 	@go test -v -count 1 $(TEST_CMD) ./tests
 
+.PHONY: test-data
+test-data:
+	@go test -v -count 1 -run '^TestTicketsCreate$$' ./tests
+
 .PHONY: migrate-up
 migrate-up:
 	@go run ./cmd/migrate up

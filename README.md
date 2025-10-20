@@ -11,6 +11,7 @@
 
 * Start containers using `docker-compose up -d`
 * Apply database migrations using `make migrate-up`
+* Populate test data with `make test-data`
 * Start API server using `make run`
 * Start React app:
   - `cd web && npm install && npm run dev`
