@@ -1,0 +1,493 @@
+openapi: 3.0.3
+info:
+  title: Thoughtly Ticket Booking API
+  description: API for event ticket booking and reservation system
+  version: 1.0.0
+  contact:
+    name: API Support
+
+servers:
+  - url: http://localhost:8080
+    description: Local development server
+
+tags:
+  - name: Events
+    description: Event management and information
+  - name: Reservations
+    description: Ticket reservation operations
+  - name: Users
+    description: User-related operations
+  - name: Health
+    description: Health check endpoints
+
+paths:
+  /api/ping:
+    get:
+      tags:
+        - Health
+      summary: Health check endpoint
+      description: Returns 200 OK if the server is running
+      operationId: ping
+      responses:
+        '200':
+          description: Server is healthy
+
+  /api/events:
+    get:
+      tags:
+        - Events
+      summary: List all events
+      description: Retrieves a list of all available events
+      operationId: listEvents
+      responses:
+        '200':
+          description: List of events
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListEventsResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    post:
+      tags:
+        - Events
+      summary: Create a new event
+      description: Creates a new event with ticket tiers (test endpoint)
+      operationId: createEvent
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EventCreateParams'
+      responses:
+        '200':
+          description: Event created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventCreateResult'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/events/{eventID}/tiers:
+    get:
+      tags:
+        - Events
+      summary: List ticket tiers for an event
+      description: Retrieves available ticket tiers and their availability for a specific event
+      operationId: listTiers
+      parameters:
+        - name: eventID
+          in: path
+          required: true
+          description: UUID of the event
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: List of ticket tiers
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListTiersResponse'
+        '400':
+          description: Bad request (invalid UUID)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Event not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/events/{eventID}/reserve:
+    post:
+      tags:
+        - Reservations
+      summary: Reserve tickets for an event
+      description: Creates a ticket reservation for the specified event with ticket tier quantities
+      operationId: reserveTickets
+      parameters:
+        - name: eventID
+          in: path
+          required: true
+          description: UUID of the event
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReserveTicketsRequest'
+      responses:
+        '200':
+          description: Tickets reserved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReservationResult'
+        '400':
+          description: Bad request (invalid data or insufficient tickets)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/reservations/{reservationID}/payment:
+    post:
+      tags:
+        - Reservations
+      summary: Pay for a reservation
+      description: Processes payment for an existing reservation
+      operationId: payReservation
+      parameters:
+        - name: reservationID
+          in: path
+          required: true
+          description: UUID of the reservation
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PaymentParams'
+      responses:
+        '200':
+          description: Payment processed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentResult'
+        '400':
+          description: Bad request (invalid data or reservation expired)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Reservation not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/users/{userID}/reservations:
+    get:
+      tags:
+        - Users
+      summary: List user reservations
+      description: Retrieves all reservations for a specific user
+      operationId: listUserReservations
+      parameters:
+        - name: userID
+          in: path
+          required: true
+          description: UUID of the user
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: List of user reservations
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListReservationsResponse'
+        '400':
+          description: Bad request (invalid UUID)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  schemas:
+    ErrorResponse:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: string
+          description: Error message
+          example: "Invalid request parameters"
+
+    Event:
+      type: object
+      required:
+        - id
+        - name
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique identifier of the event
+        name:
+          type: string
+          description: Name of the event
+          example: "Concert 2025"
+
+    ListEventsResponse:
+      type: object
+      required:
+        - events
+      properties:
+        events:
+          type: array
+          items:
+            $ref: '#/components/schemas/Event'
+
+    TicketTier:
+      type: object
+      required:
+        - tier_id
+        - name
+        - priceCents
+        - availableCount
+      properties:
+        tier_id:
+          type: string
+          format: uuid
+          description: Unique identifier of the ticket tier
+        name:
+          type: string
+          description: Name of the ticket tier
+          example: "VIP"
+        priceCents:
+          type: integer
+          description: Price in cents
+          example: 15000
+        availableCount:
+          type: integer
+          description: Number of available tickets
+          example: 100
+
+    ListTiersResponse:
+      type: object
+      required:
+        - tiers
+      properties:
+        tiers:
+          type: array
+          items:
+            $ref: '#/components/schemas/TicketTier'
+
+    CreateTierParams:
+      type: object
+      required:
+        - priceCents
+        - ticketsCount
+      properties:
+        priceCents:
+          type: integer
+          description: Price per ticket in cents
+          example: 5000
+        ticketsCount:
+          type: integer
+          description: Total number of tickets for this tier
+          example: 200
+
+    EventCreateParams:
+      type: object
+      required:
+        - name
+        - tiers
+      properties:
+        name:
+          type: string
+          description: Name of the event
+          example: "Summer Music Festival"
+        tiers:
+          type: object
+          description: Map of tier names to tier parameters
+          additionalProperties:
+            $ref: '#/components/schemas/CreateTierParams'
+          example:
+            VIP:
+              priceCents: 15000
+              ticketsCount: 50
+            General:
+              priceCents: 5000
+              ticketsCount: 200
+
+    EventCreateResult:
+      type: object
+      required:
+        - eventId
+        - tiers
+      properties:
+        eventId:
+          type: string
+          format: uuid
+          description: UUID of the created event
+        tiers:
+          type: object
+          description: Map of tier names to tier UUIDs
+          additionalProperties:
+            type: string
+            format: uuid
+          example:
+            VIP: "123e4567-e89b-12d3-a456-426614174000"
+            General: "123e4567-e89b-12d3-a456-426614174001"
+
+    ReserveTicketsRequest:
+      type: object
+      required:
+        - idempotencyKey
+        - actorID
+        - ticketsCount
+      properties:
+        idempotencyKey:
+          type: string
+          format: uuid
+          description: Idempotency key to prevent duplicate reservations
+        actorID:
+          type: string
+          format: uuid
+          description: UUID of the user making the reservation
+        ticketsCount:
+          type: object
+          description: Map of tier IDs to quantity of tickets
+          additionalProperties:
+            type: integer
+            minimum: 1
+          example:
+            "123e4567-e89b-12d3-a456-426614174000": 2
+            "123e4567-e89b-12d3-a456-426614174001": 1
+
+    ReservationResult:
+      type: object
+      required:
+        - reservationID
+        - expiresAt
+      properties:
+        reservationID:
+          type: string
+          format: uuid
+          description: UUID of the created reservation
+        expiresAt:
+          type: string
+          format: date-time
+          description: Timestamp when the reservation expires
+          example: "2025-10-20T15:30:00Z"
+
+    ReservationMeta:
+      type: object
+      required:
+        - id
+        - eventID
+        - eventName
+        - expiresAt
+        - isPaid
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: UUID of the reservation
+        eventID:
+          type: string
+          format: uuid
+          description: UUID of the event
+        eventName:
+          type: string
+          description: Name of the event
+          example: "Summer Music Festival"
+        expiresAt:
+          type: string
+          format: date-time
+          description: Timestamp when the reservation expires
+          example: "2025-10-20T15:30:00Z"
+        isPaid:
+          type: boolean
+          description: Whether the reservation has been paid
+          example: false
+
+    ListReservationsResponse:
+      type: object
+      required:
+        - reservations
+      properties:
+        reservations:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReservationMeta'
+
+    PaymentParams:
+      type: object
+      required:
+        - reservationID
+        - cardNumber
+      properties:
+        reservationID:
+          type: string
+          format: uuid
+          description: UUID of the reservation to pay for
+        cardNumber:
+          type: string
+          description: Credit card number
+          example: "4111111111111111"
+
+    PaymentResult:
+      type: object
+      required:
+        - txId
+        - amountCents
+      properties:
+        txId:
+          type: string
+          format: uuid
+          description: UUID of the transaction
+        amountCents:
+          type: integer
+          description: Total amount charged in cents
+          example: 20000
+
