@@ -45,9 +45,9 @@ func (svc Service) CreateEvent(ctx context.Context, opts EventCreateParams) (res
 		}
 	}()
 
-	_, err = tx.Exec(ctx, `INSERT INTO events (id, name) VALUES (?, ?)`, eventID, opts.EventName)
+	_, err = tx.Exec(ctx, `INSERT INTO events (id, name) VALUES ($1, $2)`, eventID, opts.EventName)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("cannot insert event %q: %w", opts.EventName, err)
 	}
 
 	for k, v := range opts.Tiers {
@@ -55,11 +55,11 @@ func (svc Service) CreateEvent(ctx context.Context, opts EventCreateParams) (res
 		tiers[k] = tierID
 
 		_, err := tx.Exec(
-			ctx, `INSERT INTO ticket_tiers (id, event_id, name, price_cents) VALUES (?, ?, ?, ?)`,
+			ctx, `INSERT INTO ticket_tiers (id, event_id, name, price_cents) VALUES ($1, $2, $3, $4)`,
 			tierID, eventID, k, v.PriceCents,
 		)
 		if err != nil {
-			return nil, fmt.Errorf("can't create tier %q", k)
+			return nil, fmt.Errorf("can't create tier %q: %w", k, err)
 		}
 
 		_, err = tx.Exec(
@@ -68,7 +68,7 @@ func (svc Service) CreateEvent(ctx context.Context, opts EventCreateParams) (res
 			eventID, tierID, v.TicketsCount,
 		)
 		if err != nil {
-			return nil, fmt.Errorf("can't create tickets for tier %q", k)
+			return nil, fmt.Errorf("can't create tickets for tier %q: %w", k, err)
 		}
 	}
 
