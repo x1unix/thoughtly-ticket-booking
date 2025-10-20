@@ -7,18 +7,17 @@ CREATE TABLE events (
 );
 
 CREATE TABLE ticket_tiers (
-  id            UUID PRIMARY KEY DEFAULT uuidv4,
+  id            UUID PRIMARY KEY DEFAULT uuidv4(),
   event_id      UUID NOT NULL REFERENCES events(id) ON DELETE CASCADE,
-  code          TEXT NOT NULL,
-  display_name  TEXT NOT NULL,
+  name          TEXT NOT NULL,
   price_cents   INTEGER NOT NULL CHECK (price_cents >= 0),
-  UNIQUE (event_id, code)
+  UNIQUE (event_id, name)
 );
 
 CREATE TABLE tickets (
-  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  id              UUID PRIMARY KEY DEFAULT uuidv4(),
   event_id        UUID NOT NULL REFERENCES events(id) ON DELETE CASCADE,
-  tier_id         UUID NOT NULL REFERENCES price_tiers(id) ON DELETE RESTRICT,
+  tier_id         UUID NOT NULL REFERENCES ticlet_tiers(id) ON DELETE RESTRICT,
   is_sold         BOOLEAN NOT NULL DEFAULT FALSE,
   hold_token      UUID,
   hold_expires_at TIMESTAMPTZ

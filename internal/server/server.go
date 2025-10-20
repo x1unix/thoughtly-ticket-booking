@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
 	"time"
 
 	"github.com/goccy/go-json"
@@ -13,6 +14,7 @@ import (
 	"github.com/redis/go-redis/v9"
 	"go.uber.org/zap"
 
+	"github.com/x1unix/thoughtly-ticket-booking/internal/booking"
 	"github.com/x1unix/thoughtly-ticket-booking/internal/config"
 )
 
@@ -24,30 +26,46 @@ const (
 type Server struct {
 	logger *zap.SugaredLogger
 	cfg    *config.Config
-	db     pgxpool.Conn
+	db     *pgxpool.Pool
 	rdb    redis.UniversalClient
+	svc    *booking.Service
+	app    *fiber.App
 }
 
 func NewServer(ctx context.Context, logger *zap.Logger, cfg *config.Config) (*Server, error) {
+	db, err := cfg.DB.NewPgxPool(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := db.Ping(ctx); err != nil {
+		return nil, fmt.Errorf("failed to conn to db: %w", err)
+	}
+
 	rdb, err := cfg.Redis.NewRedisClient(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	db, err := cfg.DB.NewPgxPool(ctx)
-	if err != nil {
-		return nil, err
-	}
-	if err := db.Ping(ctx); err != nil {
-		return nil, fmt.Errorf("failed to conn to db: %w", err)
-	}
-	_ = rdb
-	_ = db
-
 	return &Server{
 		logger: logger.Sugar(),
 		cfg:    cfg,
+		db:     db,
+		rdb:    rdb,
+		svc:    booking.NewService(db, rdb),
 	}, nil
+}
+
+func (srv *Server) mountRoutes(app *fiber.App) {
+	// Endpoints for tests
+	app.Post("/api/events", srv.handleCreateEvent)
+	app.Post("/api/ping", func(c *fiber.Ctx) error {
+		return c.SendStatus(http.StatusOK)
+	})
+
+	// Client API
+	app.Get("/api/events", srv.handleListEvents)
+	app.Get("/api/events/:eventID/tiers", srv.handleListTiersSummary)
 }
 
 func (srv *Server) Listen(ctx context.Context) {
@@ -63,9 +81,8 @@ func (srv *Server) Listen(ctx context.Context) {
 	})
 
 	app.Use(fiberRecover.New())
-	app.Get("/readyz", func(c *fiber.Ctx) error {
-		return c.SendString("test")
-	})
+	srv.mountRoutes(app)
+	srv.app = app
 
 	go func() {
 		srv.logger.Infof("listening on %q", srv.cfg.HTTP.ListenAddress)
@@ -78,7 +95,19 @@ func (srv *Server) Listen(ctx context.Context) {
 			srv.logger.Fatal("failed to start HTTP server:", err)
 		}
 	}()
+}
 
+func (srv *Server) Close() {
+	defer srv.db.Close()
+	defer srv.rdb.Close()
+
+	if srv.app != nil {
+		srv.app.ShutdownWithTimeout(shutdownTimeout)
+	}
+}
+
+func (srv *Server) ListenAndWait(ctx context.Context) {
+	srv.Listen(ctx)
 	<-ctx.Done()
-	app.ShutdownWithTimeout(shutdownTimeout)
+	srv.Close()
 }

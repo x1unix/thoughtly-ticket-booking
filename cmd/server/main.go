@@ -55,6 +55,6 @@ func run(logger *zap.Logger, cfg *config.Config) error {
 		return fmt.Errorf("failed to build server: %w", err)
 	}
 
-	srv.Listen(ctx)
+	srv.ListenAndWait(ctx)
 	return nil
 }

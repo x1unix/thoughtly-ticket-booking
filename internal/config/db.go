@@ -5,8 +5,10 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
+	pgxUUID "github.com/vgarvardt/pgx-google-uuid/v5"
 )
 
 type DBConfig struct {
@@ -14,8 +16,17 @@ type DBConfig struct {
 }
 
 func (cfg DBConfig) NewPgxPool(ctx context.Context) (*pgxpool.Pool, error) {
-	// TODO: tracing
-	conn, err := pgxpool.New(ctx, cfg.URL)
+	pgcfg, err := pgxpool.ParseConfig(cfg.URL)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse Postgres config: %w", err)
+	}
+
+	pgcfg.AfterConnect = func(ctx context.Context, c *pgx.Conn) error {
+		pgxUUID.Register(c.TypeMap())
+		return nil
+	}
+
+	conn, err := pgxpool.NewWithConfig(ctx, pgcfg)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build Postgres client: %w", err)
 	}
