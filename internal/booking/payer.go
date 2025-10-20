@@ -21,7 +21,7 @@ type Payer interface {
 	Rollback(txID uuid.UUID) error
 }
 
-const KnownFakeCard = "1234567890"
+const KnownFakeCard = "4111111111111111"
 
 type MockPayer struct{}
 
