@@ -60,3 +60,62 @@ func TestTicketsReserve(t *testing.T) {
 	})
 	require.NoError(t, err)
 }
+
+func TestTicketsReserveAndPay(t *testing.T) {
+	eventName := fmt.Sprintf("CreateEventTest-%v", time.Now().UnixNano())
+	tiers := map[string]booking.CreateTierParams{
+		"VIP": {
+			PriceCents:   100_00,
+			TicketsCount: 50,
+		},
+		"Front Row": {
+			PriceCents:   50_00,
+			TicketsCount: 100,
+		},
+		"GA": {
+			PriceCents:   10_00,
+			TicketsCount: 1000,
+		},
+	}
+
+	createRsp := client.CreateEvent(t, booking.EventCreateParams{
+		EventName: eventName,
+		Tiers:     tiers,
+	})
+
+	userID := uuid.New()
+	eventID := createRsp.EventID
+	tierIDs := createRsp.Tiers
+
+	// Reserve tickets
+	rsp, err := client.ReserveTickets(eventID, server.ReserveTicketsRequest{
+		IdempotencyKey: uuid.New(),
+		ActorID:        userID,
+		TicketsCount: map[uuid.UUID]uint{
+			tierIDs["VIP"]: uint(10),
+		},
+	})
+	require.NoError(t, err)
+	require.NotEmpty(t, rsp.ReservationID)
+
+	// Verify reservation exists and is unpaid
+	reservations := client.GetReservations(t, userID)
+	require.Len(t, reservations.Reservations, 1)
+	require.Equal(t, rsp.ReservationID, reservations.Reservations[0].ID)
+	require.False(t, reservations.Reservations[0].IsPaid, "reservation should not be paid yet")
+
+	// Pay for reservation
+	expectedTotal := uint(10 * tiers["VIP"].PriceCents)
+	payResult, err := client.PayReservation(rsp.ReservationID, booking.PaymentParams{
+		ReservationID: rsp.ReservationID,
+		CardNumber:    booking.KnownFakeCard,
+	})
+	require.NoError(t, err)
+	require.NotEmpty(t, payResult.TxID)
+	require.Equal(t, expectedTotal, payResult.AmountCents, "total should be 10 VIP tickets")
+
+	// Verify reservation is now paid
+	reservations = client.GetReservations(t, userID)
+	require.Len(t, reservations.Reservations, 1)
+	require.True(t, reservations.Reservations[0].IsPaid, "reservation should be paid")
+}
