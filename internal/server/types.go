@@ -23,3 +23,7 @@ type ReserveTicketsRequest struct {
 	ActorID        uuid.UUID          `json:"actorID"`
 	TicketsCount   map[uuid.UUID]uint `json:"ticketsCount"`
 }
+
+type ListReservationsResponse struct {
+	Reservations []*booking.ReservationMeta `json:"reservations"`
+}

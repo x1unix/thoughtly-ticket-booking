@@ -107,6 +107,31 @@ func (c *Client) ReserveTickets(eventID uuid.UUID, params server.ReserveTicketsR
 	return rsp, err
 }
 
+func (c *Client) GetReservations(t *testing.T, userID uuid.UUID) *server.ListReservationsResponse {
+	t.Helper()
+	req, err := c.newGetRequest("/api/users/", userID.String(), "/reservations")
+	require.NoError(t, err)
+
+	rsp := &server.ListReservationsResponse{}
+	require.NoError(t, c.doRequest(req, rsp))
+	return rsp
+}
+
+func (c *Client) PayReservation(reservationID uuid.UUID, params booking.PaymentParams) (*booking.PaymentResult, error) {
+	rpath := fmt.Sprintf("/api/reservations/%s/payment", reservationID)
+	req, err := c.newJSONRequest(rpath, params)
+	if err != nil {
+		return nil, err
+	}
+
+	rsp := &booking.PaymentResult{}
+	if err := c.doRequest(req, rsp); err != nil {
+		return nil, err
+	}
+
+	return rsp, nil
+}
+
 func (c *Client) newGetRequest(parts ...string) (*http.Request, error) {
 	uri := c.addr + strings.Join(parts, "")
 	req, err := http.NewRequest(http.MethodGet, uri, nil)

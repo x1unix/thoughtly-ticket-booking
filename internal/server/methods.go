@@ -88,6 +88,57 @@ func (srv *Server) handleReserveTickets(c *fiber.Ctx) error {
 	return c.JSON(rsp)
 }
 
+type userIDRequest struct {
+	UserID uuid.UUID `params:"userID"`
+}
+
+func (srv *Server) handleListReservations(c *fiber.Ctx) error {
+	var params userIDRequest
+	if err := c.ParamsParser(&params); err != nil {
+		return fiber.NewError(http.StatusBadRequest, err.Error())
+	}
+
+	items, err := srv.svc.GetReservations(c.Context(), params.UserID)
+	if err != nil {
+		return err
+	}
+
+	return c.JSON(&ListReservationsResponse{
+		Reservations: items,
+	})
+}
+
+type reservationIDRequest struct {
+	ReservationID uuid.UUID `params:"reservationID"`
+}
+
+func (srv *Server) handlePayReservation(c *fiber.Ctx) error {
+	var params reservationIDRequest
+	if err := c.ParamsParser(&params); err != nil {
+		return fiber.NewError(http.StatusBadRequest, err.Error())
+	}
+
+	var body booking.PaymentParams
+	if err := c.BodyParser(&body); err != nil {
+		return fiber.NewError(http.StatusBadRequest, err.Error())
+	}
+
+	rsp, err := srv.svc.PayReservation(c.Context(), body)
+	if err != nil {
+		if errors.Is(err, booking.ErrNotFound) {
+			return errNotFound("reservation not found")
+		}
+
+		if errors.Is(err, booking.ErrReservationExpired) {
+			return errBadRequest("reservation expired")
+		}
+
+		return err
+	}
+
+	return c.JSON(rsp)
+}
+
 func errNotFound(msg string) error {
 	return fiber.NewError(http.StatusNotFound, msg)
 }

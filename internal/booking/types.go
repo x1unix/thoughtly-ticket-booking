@@ -45,3 +45,21 @@ type ReservationResult struct {
 	ReservationID uuid.UUID `json:"reservationID"`
 	ExpiresAt     time.Time `json:"expiresAt"`
 }
+
+type ReservationMeta struct {
+	ID        uuid.UUID `json:"id" db:"id"`
+	EventID   uuid.UUID `json:"eventID" db:"event_id"`
+	EventName string    `json:"eventName" db:"event_name"`
+	ExpiresAt time.Time `json:"expiresAt" db:"expires_at"`
+	IsPaid    bool      `json:"isPaid" db:"is_paid"`
+}
+
+type PaymentResult struct {
+	TxID        uuid.UUID `json:"txId"`
+	AmountCents uint      `json:"amountCents"`
+}
+
+type PaymentParams struct {
+	ReservationID uuid.UUID `json:"reservationID"`
+	CardNumber    string    `json:"cardNumber"`
+}

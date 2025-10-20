@@ -7,7 +7,10 @@ import (
 	"github.com/google/uuid"
 )
 
-var ErrNotFound = errors.New("not found")
+var (
+	ErrNotFound           = errors.New("not found")
+	ErrReservationExpired = errors.New("reservation is expired")
+)
 
 type InsufficientTicketsError struct {
 	TierID uuid.UUID

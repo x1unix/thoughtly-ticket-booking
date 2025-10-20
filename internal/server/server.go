@@ -67,6 +67,8 @@ func (srv *Server) mountRoutes(app *fiber.App) {
 	app.Get("/api/events", srv.handleListEvents)
 	app.Get("/api/events/:eventID/tiers", srv.handleListTiersSummary)
 	app.Post("/api/events/:eventID/reserve", srv.handleReserveTickets)
+	app.Post("/api/reservations/:reservationID/payment", srv.handlePayReservation)
+	app.Get("/api/users/:userID/reservations", srv.handleListReservations)
 }
 
 func (srv *Server) Listen(ctx context.Context) {

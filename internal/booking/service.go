@@ -18,14 +18,16 @@ const (
 )
 
 type Service struct {
-	db  *pgxpool.Pool
-	rdb redis.UniversalClient
+	db    *pgxpool.Pool
+	rdb   redis.UniversalClient
+	payer Payer
 }
 
 func NewService(db *pgxpool.Pool, rdb redis.UniversalClient) *Service {
 	return &Service{
-		db:  db,
-		rdb: rdb,
+		db:    db,
+		rdb:   rdb,
+		payer: &MockPayer{},
 	}
 }
 
@@ -99,6 +101,154 @@ func (svc Service) GetEvents(ctx context.Context) ([]*Event, error) {
 	return result, nil
 }
 
+func (svc Service) GetReservationEntries(ctx context.Context, reservationID uuid.UUID) (*ReservationMeta, error) {
+	result := &ReservationMeta{}
+	err := pgxscan.Get(
+		ctx, svc.db, result,
+		`SELECT r.id, r.expires_at, r.is_paid, e.event_id, e.name as event_name 
+		FROM reservations r
+		LEFT JOIN events e ON r.event_id = e.id
+		WHERE r.id = $1
+		LIMIT 1`,
+		reservationID,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrNotFound
+		}
+
+		return nil, fmt.Errorf("failed to query reservation: %w", err)
+	}
+
+	return result, nil
+}
+
+func (svc Service) GetReservations(ctx context.Context, userID uuid.UUID) ([]*ReservationMeta, error) {
+	var result []*ReservationMeta
+	err := pgxscan.Select(
+		ctx, svc.db, &result,
+		`SELECT r.id, r.expires_at, r.is_paid, e.event_id, e.name as event_name 
+		FROM reservations r
+		LEFT JOIN events e ON r.event_id = e.id
+		WHERE r.actor_id = $1`,
+		userID,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
+
+		return nil, fmt.Errorf("failed to query reservations: %w", err)
+	}
+
+	return result, nil
+}
+
+type reservationHeader struct {
+	ExpiresAt time.Time `db:"expires_at"`
+	IsPaid    bool      `db:"is_paid"`
+}
+
+func (svc Service) PayReservation(ctx context.Context, params PaymentParams) (*PaymentResult, error) {
+	rID := params.ReservationID
+	cardNumber := params.CardNumber
+
+	tx, err := svc.db.BeginTx(ctx, pgx.TxOptions{
+		IsoLevel:   pgx.ReadCommitted,
+		AccessMode: pgx.ReadWrite,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to open TX: %w", err)
+	}
+
+	defer tx.Rollback(ctx)
+
+	h := &reservationHeader{}
+	err = pgxscan.Get(ctx, tx, h, `SELECT expires_at, is_paid FROM reservations WHERE id = $1`, rID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrNotFound
+		}
+
+		return nil, fmt.Errorf("failed to get reservation: %w", err)
+	}
+
+	if h.IsPaid {
+		return nil, errors.New("reservation already paid")
+	}
+
+	now := time.Now()
+	if now.After(h.ExpiresAt) {
+		return nil, ErrReservationExpired
+	}
+
+	// Get tickets by reservation ID and compute total price from ticket_tiers
+	type ticketPrice struct {
+		PriceCents int `db:"price_cents"`
+	}
+
+	var ticketPrices []ticketPrice
+	err = pgxscan.Select(ctx, tx, &ticketPrices, `
+		SELECT tt.price_cents
+		FROM tickets t
+		JOIN ticket_tiers tt ON t.tier_id = tt.id
+		WHERE t.hold_token = $1
+	`, rID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get ticket prices: %w", err)
+	}
+
+	if len(ticketPrices) == 0 {
+		return nil, errors.New("no tickets found for reservation")
+	}
+
+	// Compute total price
+	var totalCents uint = 0
+	for _, tp := range ticketPrices {
+		totalCents += uint(tp.PriceCents)
+	}
+
+	// Call payer to process payment
+	payResult, err := svc.payer.Pay(PayParams{
+		ReservID:    rID,
+		Card:        cardNumber,
+		AmountCents: totalCents,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("payment failed: %w", err)
+	}
+
+	_, err = tx.Exec(ctx, `
+		UPDATE tickets 
+		SET is_sold = true, hold_token = NULL, hold_expires_at = NULL
+		WHERE hold_token = $1
+	`, rID)
+	if err != nil {
+		_ = svc.payer.Rollback(payResult.TXID)
+		return nil, fmt.Errorf("failed to mark tickets as sold: %w", err)
+	}
+
+	_, err = tx.Exec(ctx, `
+		UPDATE reservations 
+		SET is_paid = true
+		WHERE id = $1
+	`, rID)
+	if err != nil {
+		_ = svc.payer.Rollback(payResult.TXID)
+		return nil, fmt.Errorf("failed to mark reservation as paid: %w", err)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		_ = svc.payer.Rollback(payResult.TXID)
+		return nil, fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	return &PaymentResult{
+		TxID:        payResult.TXID,
+		AmountCents: totalCents,
+	}, nil
+}
+
 func (svc Service) ReserveTickets(ctx context.Context, params ReservationParams) (*ReservationResult, error) {
 	reservationID := uuid.New()
 	expireAt := time.Now().Add(reservationTTL)
@@ -110,7 +260,9 @@ func (svc Service) ReserveTickets(ctx context.Context, params ReservationParams)
 		return nil, fmt.Errorf("failed to open TX: %w", err)
 	}
 
+	// TODO: store and update reservation total price
 	defer tx.Rollback(ctx)
+
 	_, err = tx.Exec(
 		ctx, `
 		INSERT INTO reservations (id, event_id, actor_id, expires_at, idempotency_key)
