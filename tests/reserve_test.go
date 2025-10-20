@@ -49,4 +49,14 @@ func TestTicketsReserve(t *testing.T) {
 	})
 	require.Error(t, err, "should fail if requested too much tickets")
 	require.Contains(t, err.Error(), "not enough tickets available of tier")
+
+	// Should success on enough tickets
+	_, err = client.ReserveTickets(eventID, server.ReserveTicketsRequest{
+		IdempotencyKey: uuid.New(),
+		ActorID:        userID,
+		TicketsCount: map[uuid.UUID]uint{
+			tierIDs["VIP"]: uint(10),
+		},
+	})
+	require.NoError(t, err)
 }
