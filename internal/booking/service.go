@@ -129,7 +129,7 @@ func (svc Service) GetReservations(ctx context.Context, userID uuid.UUID) ([]*Re
 		ctx, svc.db, &result,
 		`SELECT r.id, r.expires_at, r.is_paid, e.id as event_id, e.name as event_name 
 		FROM reservations r
-		LEFT JOIN events e ON r.event_id = e.id
+		INNER JOIN events e ON r.event_id = e.id
 		WHERE r.actor_id = $1`,
 		userID,
 	)
