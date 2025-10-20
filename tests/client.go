@@ -114,6 +114,7 @@ func (c *Client) newJSONRequest(rpath string, body any) (*http.Request, error) {
 	if err != nil {
 		return nil, fmt.Errorf("%s %q: cannot create request: %w", req.Method, uri, err)
 	}
+	req.Header.Set("Content-Type", "application/json")
 
 	return req, nil
 }
