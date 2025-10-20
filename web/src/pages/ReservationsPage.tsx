@@ -70,7 +70,7 @@ export const ReservationsPage: React.FC = () => {
 
       {error && <ErrorAlert message={error} onClose={() => setError(null)} />}
 
-      {reservations.length === 0 ? (
+      {!reservations?.length ? (
         <div className="alert alert-info">
           <p className="mb-3">You don't have any reservations yet.</p>
           <Link to="/" className="btn btn-primary">
@@ -79,7 +79,7 @@ export const ReservationsPage: React.FC = () => {
         </div>
       ) : (
         <div className="row">
-          {reservations.map((reservation) => {
+          {reservations?.map((reservation) => {
             const expired = isExpired(reservation.expiresAt);
             return (
               <div key={reservation.id} className="col-lg-6 mb-4">
