@@ -47,7 +47,7 @@ func die(args ...any) {
 }
 
 func run(logger *zap.Logger, cfg *config.Config) error {
-	ctx, cancelFn := signal.NotifyContext(context.Background())
+	ctx, cancelFn := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer cancelFn()
 
 	srv, err := server.NewServer(ctx, logger, cfg)

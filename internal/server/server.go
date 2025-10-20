@@ -80,7 +80,7 @@ func (srv *Server) Listen(ctx context.Context) {
 		ErrorHandler: func(c *fiber.Ctx, err error) error {
 			code := fiber.StatusInternalServerError
 
-			var e *fiber.Error
+			e := new(fiber.Error)
 			if errors.As(err, &e) {
 				code = e.Code
 			}
@@ -124,5 +124,6 @@ func (srv *Server) Close() {
 func (srv *Server) ListenAndWait(ctx context.Context) {
 	srv.Listen(ctx)
 	<-ctx.Done()
+	srv.logger.Info("shutting down")
 	srv.Close()
 }
