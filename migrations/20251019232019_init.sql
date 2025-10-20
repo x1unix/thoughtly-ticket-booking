@@ -17,7 +17,7 @@ CREATE TABLE ticket_tiers (
 CREATE TABLE tickets (
   id              UUID PRIMARY KEY DEFAULT uuidv4(),
   event_id        UUID NOT NULL REFERENCES events(id) ON DELETE CASCADE,
-  tier_id         UUID NOT NULL REFERENCES ticlet_tiers(id) ON DELETE RESTRICT,
+  tier_id         UUID NOT NULL REFERENCES ticket_tiers(id) ON DELETE RESTRICT,
   is_sold         BOOLEAN NOT NULL DEFAULT FALSE,
   hold_token      UUID,
   hold_expires_at TIMESTAMPTZ

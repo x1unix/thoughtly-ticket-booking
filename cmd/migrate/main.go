@@ -29,6 +29,7 @@ func run() error {
 		return err
 	}
 
+	flag.Parse()
 	args := flag.Args()
 	if len(args) == 0 {
 		return errors.New("missing goose command")

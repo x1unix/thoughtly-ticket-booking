@@ -2,8 +2,8 @@
 package config
 
 import (
-	"flag"
 	"fmt"
+	"os"
 
 	"github.com/joho/godotenv"
 	"github.com/kelseyhightower/envconfig"
@@ -22,10 +22,8 @@ type Config struct {
 
 // LoadEnvFile populates environment variables from env file (if specified in a flag).
 func LoadEnvFile() error {
-	var envFilePath string
-	flag.StringVar(&envFilePath, "e", "", "Path to env file to load (optional)")
-	flag.Parse()
-	if envFilePath == "" {
+	envFilePath, ok := os.LookupEnv("ENV_FILE")
+	if !ok || envFilePath == "" {
 		return nil
 	}
 
