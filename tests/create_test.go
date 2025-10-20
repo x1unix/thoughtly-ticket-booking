@@ -15,15 +15,15 @@ func TestTicketsCreate(t *testing.T) {
 	tiers := map[string]booking.CreateTierParams{
 		"VIP": {
 			PriceCents:   100_00,
-			TicketsCount: 10,
+			TicketsCount: 50,
 		},
 		"Front Row": {
 			PriceCents:   50_00,
-			TicketsCount: 40,
+			TicketsCount: 100,
 		},
 		"GA": {
 			PriceCents:   10_00,
-			TicketsCount: 100,
+			TicketsCount: 1000,
 		},
 	}
 

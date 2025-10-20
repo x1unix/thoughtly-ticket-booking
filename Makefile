@@ -16,6 +16,10 @@ test:
 migrate-up:
 	@go run ./cmd/migrate up
 
+.PHONY: migrate-down
+migrate-down:
+	@go run ./cmd/migrate down
+
 .PHONY: migrate-new
 migrate-new:
 	@[ -z "$(MIGRATION_NAME)" ] && echo "Missing MIGRATION_NAME" || go run ./cmd/migrate create $(MIGRATION_NAME) sql

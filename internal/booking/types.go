@@ -1,6 +1,8 @@
 package booking
 
 import (
+	"time"
+
 	"github.com/google/uuid"
 )
 
@@ -30,4 +32,16 @@ type EventCreateParams struct {
 type EventCreateResult struct {
 	EventID uuid.UUID            `json:"eventId"`
 	Tiers   map[string]uuid.UUID `json:"tiers"`
+}
+
+type ReservationParams struct {
+	IdempotencyKey uuid.UUID          `json:"idempotencyKey"`
+	ActorID        uuid.UUID          `json:"actorID"`
+	EventID        uuid.UUID          `json:"eventID"`
+	TicketsCount   map[uuid.UUID]uint `json:"ticketsCount"`
+}
+
+type ReservationResult struct {
+	ReservationID uuid.UUID `json:"reservationID"`
+	ExpiresAt     time.Time `json:"expiresAt"`
 }

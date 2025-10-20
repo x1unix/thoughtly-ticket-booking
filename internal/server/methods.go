@@ -14,7 +14,7 @@ import (
 func (srv *Server) handleCreateEvent(c *fiber.Ctx) error {
 	var req booking.EventCreateParams
 	if err := c.BodyParser(&req); err != nil {
-		return errBadRequest(err, "can't parse request")
+		return errBadRequest("can't parse request: ", err)
 	}
 
 	rsp, err := srv.svc.CreateEvent(c.Context(), req)
@@ -60,10 +60,38 @@ func (srv *Server) handleListTiersSummary(c *fiber.Ctx) error {
 	})
 }
 
+func (srv *Server) handleReserveTickets(c *fiber.Ctx) error {
+	var params eventIDRequest
+	if err := c.ParamsParser(&params); err != nil {
+		return fiber.NewError(http.StatusBadRequest, err.Error())
+	}
+
+	var body ReserveTicketsRequest
+	if err := c.BodyParser(&body); err != nil {
+		return fiber.NewError(http.StatusBadRequest, err.Error())
+	}
+
+	rsp, err := srv.svc.ReserveTickets(c.Context(), booking.ReservationParams{
+		IdempotencyKey: body.IdempotencyKey,
+		ActorID:        body.ActorID,
+		EventID:        params.EventID,
+		TicketsCount:   body.TicketsCount,
+	})
+	if err != nil {
+		if booking.IsInsufficientTicketsError(err) {
+			return errBadRequest(err)
+		}
+
+		return err
+	}
+
+	return c.JSON(rsp)
+}
+
 func errNotFound(msg string) error {
 	return fiber.NewError(http.StatusNotFound, msg)
 }
 
-func errBadRequest(err error, msg string) error {
-	return fiber.NewError(http.StatusBadRequest, fmt.Sprintf("can't parse request: %s", err))
+func errBadRequest(args ...any) error {
+	return fiber.NewError(http.StatusBadRequest, fmt.Sprint(args...))
 }

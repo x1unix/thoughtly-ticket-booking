@@ -29,6 +29,15 @@ CREATE TABLE tickets (
   )
 );
 
+CREATE TABLE reservations (
+  id UUID PRIMARY KEY,
+  event_id UUID NOT NULL,
+  actor_id UUID NOT NULL,
+  expires_at TIMESTAMPTZ NOT NULL,
+  idempotency_key UUID UNIQUE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 -- Useful indexes for performance.
 -- Can be a hot path during peaks as is_sold and hold_expires_at freq updates.
 -- But since we have at peak 500 concurrent users at (1k DAU) - should be cheap.

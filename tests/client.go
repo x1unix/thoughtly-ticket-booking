@@ -92,6 +92,21 @@ func (c *Client) GetTicketTiers(t *testing.T, eventID uuid.UUID) *server.ListTie
 	return rsp
 }
 
+func (c *Client) ReserveTickets(eventID uuid.UUID, params server.ReserveTicketsRequest) (*booking.ReservationResult, error) {
+	rpath := fmt.Sprintf("/api/events/%s/reserve", eventID)
+	req, err := c.newJSONRequest(rpath, params)
+	if err != nil {
+		return nil, err
+	}
+
+	rsp := &booking.ReservationResult{}
+	if err := c.doRequest(req, rsp); err != nil {
+		return nil, err
+	}
+
+	return rsp, err
+}
+
 func (c *Client) newGetRequest(parts ...string) (*http.Request, error) {
 	uri := c.addr + strings.Join(parts, "")
 	req, err := http.NewRequest(http.MethodGet, uri, nil)

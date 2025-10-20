@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/georgysavva/scany/v2/pgxscan"
 	"github.com/google/uuid"
@@ -12,7 +13,9 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-var ErrNotFound = errors.New("not found")
+const (
+	reservationTTL = 15 * time.Minute
+)
 
 type Service struct {
 	db  *pgxpool.Pool
@@ -96,9 +99,84 @@ func (svc Service) GetEvents(ctx context.Context) ([]*Event, error) {
 	return result, nil
 }
 
+func (svc Service) ReserveTickets(ctx context.Context, params ReservationParams) (*ReservationResult, error) {
+	reservationID := uuid.New()
+	expireAt := time.Now().Add(reservationTTL)
+
+	tx, err := svc.db.BeginTx(ctx, pgx.TxOptions{
+		IsoLevel: pgx.ReadCommitted,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to open TX: %w", err)
+	}
+
+	defer tx.Rollback(ctx)
+	_, err = tx.Exec(
+		ctx, `
+		INSERT INTO reservations (id, event_id, actor_id, expires_at, idempotency_key)
+		VALUES ($1, $2, $3, $4, $5)
+		ON CONFLICT (idempotency_key) DO NOTHING
+		`,
+		reservationID, params.EventID, params.ActorID, expireAt, params.IdempotencyKey,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create reservation: %w", err)
+	}
+
+	for tierID, qty := range params.TicketsCount {
+		if qty == 0 {
+			continue
+		}
+
+		rows, err := tx.Query(ctx, `
+			WITH picked AS (
+				SELECT id
+				FROM tickets
+				WHERE event_id = $1
+					AND tier_id  = $2
+					AND is_sold  = false
+					AND (hold_expires_at IS NULL OR hold_expires_at < now())
+				ORDER BY id
+				FOR UPDATE SKIP LOCKED
+				LIMIT $3
+			)
+			UPDATE tickets t
+			SET hold_token = $4, hold_expires_at = $5
+			WHERE t.id IN (SELECT id FROM picked)
+			RETURNING t.id
+		`,
+			params.EventID, tierID, qty, reservationID, expireAt,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to lock tickets of tier %q: %w", tierID, err)
+		}
+
+		// cmp locked and expected count
+		got := 0
+		for rows.Next() {
+			got++
+		}
+		rows.Close()
+
+		if got != int(qty) {
+			return nil, NewInsufficientTicketsError(tierID)
+		}
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	return &ReservationResult{
+		ReservationID: reservationID,
+		ExpiresAt:     expireAt,
+	}, nil
+}
+
 func (svc Service) GetTicketTiers(ctx context.Context, eventID uuid.UUID) ([]*TicketTier, error) {
 	var result []*TicketTier
 
+	// TODO: use different approach to check counters as query is quite expensive.
 	query := `
 	SELECT 
 		tt.id AS tier_id,
@@ -110,7 +188,7 @@ func (svc Service) GetTicketTiers(ctx context.Context, eventID uuid.UUID) ([]*Ti
 		) AS available_count
 	FROM ticket_tiers tt
 	LEFT JOIN tickets t ON t.tier_id = tt.id
-	WHERE tt.event_id = $1  -- Replace with your event_id parameter
+	WHERE tt.event_id = $1
 	GROUP BY tt.id, tt.name, tt.price_cents, tt.event_id
 	ORDER BY tt.price_cents
 `
