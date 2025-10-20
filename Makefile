@@ -1,4 +1,4 @@
-export ENV_FILE=local.env
+export ENV_FILE=$(CURDIR)/local.env
 
 .PHONY: help
 help:
@@ -10,7 +10,7 @@ run:
 
 .PHONY: test
 test:
-	@go test -v -count 1 $(TEST_CMD) ./cmd/server
+	@go test -v -count 1 $(TEST_CMD) ./tests
 
 .PHONY: migrate-up
 migrate-up:

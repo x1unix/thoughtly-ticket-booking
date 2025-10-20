@@ -16,13 +16,15 @@ type TicketTier struct {
 	AvailableCount int       `json:"availableCount" db:"available_count"`
 }
 
+type CreateTierParams struct {
+	PriceCents   int `json:"priceCents"`
+	TicketsCount int `json:"ticketsCount"`
+}
+
 type EventCreateParams struct {
 	EventName string `json:"name"`
 
-	Tiers map[string]struct {
-		PriceCents   int `json:"priceCents"`
-		TicketsCount int `json:"ticketsCount"`
-	} `json:"tiers"`
+	Tiers map[string]CreateTierParams `json:"tiers"`
 }
 
 type EventCreateResult struct {

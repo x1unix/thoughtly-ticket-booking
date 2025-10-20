@@ -2,6 +2,7 @@ package server
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 
 	"github.com/gofiber/fiber/v2"
@@ -24,10 +25,6 @@ func (srv *Server) handleCreateEvent(c *fiber.Ctx) error {
 	return c.JSON(rsp)
 }
 
-type ListEventsResponse struct {
-	Events []*booking.Event `json:"events"`
-}
-
 func (srv *Server) handleListEvents(c *fiber.Ctx) error {
 	items, err := srv.svc.GetEvents(c.Context())
 	if err != nil {
@@ -41,10 +38,6 @@ func (srv *Server) handleListEvents(c *fiber.Ctx) error {
 
 type eventIDRequest struct {
 	EventID uuid.UUID `params:"eventID"`
-}
-
-type ListTiersResponse struct {
-	Tiers []*booking.TicketTier `json:"tiers"`
 }
 
 func (srv *Server) handleListTiersSummary(c *fiber.Ctx) error {
@@ -72,5 +65,5 @@ func errNotFound(msg string) error {
 }
 
 func errBadRequest(err error, msg string) error {
-	return fiber.NewError(http.StatusBadRequest, msg, err.Error())
+	return fiber.NewError(http.StatusBadRequest, fmt.Sprintf("can't parse request: %s", err))
 }

@@ -63,6 +63,7 @@ func (c *Client) WaitForServer(retryCount int, interval time.Duration) error {
 }
 
 func (c *Client) CreateEvent(t *testing.T, body booking.EventCreateParams) *booking.EventCreateResult {
+	t.Helper()
 	req, err := c.newJSONRequest("/api/events", body)
 	require.NoError(t, err)
 
@@ -72,6 +73,7 @@ func (c *Client) CreateEvent(t *testing.T, body booking.EventCreateParams) *book
 }
 
 func (c *Client) GetEvents(t *testing.T, body booking.EventCreateParams) *server.ListEventsResponse {
+	t.Helper()
 	req, err := c.newGetRequest("/api/events")
 	require.NoError(t, err)
 
@@ -81,6 +83,7 @@ func (c *Client) GetEvents(t *testing.T, body booking.EventCreateParams) *server
 }
 
 func (c *Client) GetTicketTiers(t *testing.T, eventID uuid.UUID) *server.ListTiersResponse {
+	t.Helper()
 	req, err := c.newGetRequest("/api/events/", eventID.String(), "/tiers")
 	require.NoError(t, err)
 
@@ -93,7 +96,7 @@ func (c *Client) newGetRequest(parts ...string) (*http.Request, error) {
 	uri := c.addr + strings.Join(parts, "")
 	req, err := http.NewRequest(http.MethodGet, uri, nil)
 	if err != nil {
-		return nil, fmt.Errorf("%q: cannot create request: %w", uri, err)
+		return nil, fmt.Errorf("%s %q: cannot create request: %w", req.Method, uri, err)
 	}
 
 	return req, nil
@@ -109,7 +112,7 @@ func (c *Client) newJSONRequest(rpath string, body any) (*http.Request, error) {
 
 	req, err := http.NewRequest(http.MethodPost, uri, bytes.NewReader(b))
 	if err != nil {
-		return nil, fmt.Errorf("%q: cannot create request: %w", uri, err)
+		return nil, fmt.Errorf("%s %q: cannot create request: %w", req.Method, uri, err)
 	}
 
 	return req, nil
@@ -118,12 +121,12 @@ func (c *Client) newJSONRequest(rpath string, body any) (*http.Request, error) {
 func (c *Client) doRequest(req *http.Request, out any) error {
 	rsp, err := c.httpClient.Do(req)
 	if err != nil {
-		return fmt.Errorf("%q: failed to send request: %w", req.URL, err)
+		return fmt.Errorf("%s %q: failed to send request: %w", req.Method, req.URL, err)
 	}
 
 	defer rsp.Body.Close()
 	if rsp.StatusCode != http.StatusOK {
-		return fmt.Errorf("%q: bad status code: %q", req.URL, rsp.Status)
+		return tryReadError(req, rsp)
 	}
 
 	if out == nil {
@@ -135,4 +138,33 @@ func (c *Client) doRequest(req *http.Request, out any) error {
 	}
 
 	return nil
+}
+
+type ResponseError struct {
+	Code     int
+	Response *server.ErrorResponse
+}
+
+func newResponseError(code int, body *server.ErrorResponse) *ResponseError {
+	return &ResponseError{
+		Code:     code,
+		Response: body,
+	}
+}
+
+func (err *ResponseError) Error() string {
+	return fmt.Sprintf("%s (status: %d)", err.Response.Error, err.Code)
+}
+
+func tryReadError(req *http.Request, rsp *http.Response) error {
+	ctype := rsp.Header.Get("Content-Type")
+	if strings.HasPrefix(ctype, "application/json") {
+		errBody := &server.ErrorResponse{}
+		err := json.NewDecoder(rsp.Body).Decode(errBody)
+		if err == nil {
+			return newResponseError(rsp.StatusCode, errBody)
+		}
+	}
+
+	return fmt.Errorf("%s %q: bad status code: %q", req.Method, req.URL, rsp.Status)
 }

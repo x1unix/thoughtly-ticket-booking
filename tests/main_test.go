@@ -83,15 +83,15 @@ func truncateDB(ctx context.Context, cfg config.DBConfig) error {
 
 	defer db.Close()
 	queries := []string{
-		`TRUNCATE TABLE tickets`,
-		`TRUNCATE TABLE ticket_tiers`,
-		`TRUNCATE TABLE events`,
+		`TRUNCATE TABLE tickets CASCADE`,
+		`TRUNCATE TABLE ticket_tiers CASCADE`,
+		`TRUNCATE TABLE events CASCADE`,
 	}
 
 	for _, q := range queries {
 		_, err := db.Exec(ctx, q)
 		if err != nil {
-			return fmt.Errorf("failed to exec %q", q)
+			return fmt.Errorf("failed to exec %q: %w", q, err)
 		}
 	}
 

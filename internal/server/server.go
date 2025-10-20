@@ -59,7 +59,7 @@ func NewServer(ctx context.Context, logger *zap.Logger, cfg *config.Config) (*Se
 func (srv *Server) mountRoutes(app *fiber.App) {
 	// Endpoints for tests
 	app.Post("/api/events", srv.handleCreateEvent)
-	app.Post("/api/ping", func(c *fiber.Ctx) error {
+	app.Get("/api/ping", func(c *fiber.Ctx) error {
 		return c.SendStatus(http.StatusOK)
 	})
 
@@ -75,8 +75,20 @@ func (srv *Server) Listen(ctx context.Context) {
 		JSONEncoder:           json.Marshal,
 		JSONDecoder:           json.Unmarshal,
 		ErrorHandler: func(c *fiber.Ctx, err error) error {
-			srv.logger.Error(err)
-			return fiber.DefaultErrorHandler(c, err)
+			code := fiber.StatusInternalServerError
+
+			var e *fiber.Error
+			if errors.As(err, &e) {
+				code = e.Code
+			}
+
+			if code == fiber.StatusInternalServerError {
+				srv.logger.Error(err.Error())
+			}
+
+			return c.Status(code).JSON(&ErrorResponse{
+				Error: err.Error(),
+			})
 		},
 	})
 
