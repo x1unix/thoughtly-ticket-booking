@@ -36,13 +36,13 @@ export const EventsPage: React.FC = () => {
 
       {error && <ErrorAlert message={error} onClose={() => setError(null)} />}
 
-      {events.length === 0 ? (
+      {!events?.length ? (
         <div className="alert alert-info">
           No events available at the moment.
         </div>
       ) : (
         <div className="row">
-          {events.map((event) => (
+          {events?.map((event) => (
             <div key={event.id} className="col-md-6 col-lg-4 mb-4">
               <div className="card h-100">
                 <div className="card-body">
